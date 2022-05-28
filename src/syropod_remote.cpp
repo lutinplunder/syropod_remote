@@ -13,25 +13,25 @@
 Remote::Remote(void)
 {
   ros::NodeHandle n;
-  
+
   // Subscribe to control topic/s
   android_sensor_sub_ = n.subscribe("android/sensor", 1, &Remote::androidSensorCallback, this);
   android_joy_sub_ = n.subscribe("android/joy", 1, &Remote::androidJoyCallback, this);
   joypad_sub_ = n.subscribe("joy", 1, &Remote::joyCallback, this);
   keyboard_sub_ = n.subscribe("key", 1, &Remote::keyCallback, this);
-  
+
   // External body and pose velocity topics
   external_body_velocity_sub_ = n.subscribe("syropod_remote/external_body_velocity", 1,
                                             &Remote::externalBodyVelocityCallback, this);
   external_pose_velocity_sub_ = n.subscribe("syropod_remote/external_pose_velocity", 1,
                                             &Remote::externalPoseVelocityCallback, this);
 
-  // Setup publishers 
+  // Setup publishers
   desired_velocity_pub_ = n.advertise<geometry_msgs::Twist>("syropod_remote/desired_velocity",1);
   desired_pose_pub_ = n.advertise<geometry_msgs::Twist>("syropod_remote/desired_pose",1);
   primary_tip_velocity_pub_ = n.advertise<geometry_msgs::Point>("syropod_remote/primary_tip_velocity",1);
   secondary_tip_velocity_pub_ = n.advertise<geometry_msgs::Point>("syropod_remote/secondary_tip_velocity",1);
-  
+
   // Status publishers
   system_state_pub_ = n.advertise<std_msgs::Int8>("syropod_remote/system_state", 1);
 	robot_state_pub_ = n.advertise<std_msgs::Int8>("syropod_remote/robot_state", 1);
@@ -47,7 +47,7 @@ Remote::Remote(void)
   parameter_selection_pub_ = n.advertise<std_msgs::Int8>("syropod_remote/parameter_selection", 1);
   parameter_adjustment_pub_ = n.advertise<std_msgs::Int8>("syropod_remote/parameter_adjustment", 1);
   pose_reset_pub_ = n.advertise<std_msgs::Int8>("syropod_remote/pose_reset_mode", 1);
-  
+
   // Get (or set defaults for) parameters for other operating variables
   params_.imu_sensitivity.init("imu_sensitivity", "syropod_remote/");
   params_.publish_rate.init("publish_rate", "syropod_remote/");
@@ -97,13 +97,13 @@ void Remote::checkKonamiCode(void)
     case (KEYBOARD):
     case (JOYPAD):
     {
-      bool dPad_up_pressed = (joypad_control_.axes[JoypadAxisIndex::DPAD_UP_DOWN] == 1);
-      bool dPad_down_pressed = (joypad_control_.axes[JoypadAxisIndex::DPAD_UP_DOWN] == -1);
-      bool dPad_left_pressed = (joypad_control_.axes[JoypadAxisIndex::DPAD_LEFT_RIGHT] == 1);
-      bool dPad_right_pressed = (joypad_control_.axes[JoypadAxisIndex::DPAD_LEFT_RIGHT] == -1);
+      bool dPad_up_pressed = joypad_control_.buttons[JoypadButtonIndex::DPAD_UP];
+      bool dPad_down_pressed = joypad_control_.buttons[JoypadButtonIndex::DPAD_DOWN];
+      bool dPad_left_pressed = joypad_control_.buttons[JoypadButtonIndex::DPAD_LEFT];
+      bool dPad_right_pressed = joypad_control_.buttons[JoypadButtonIndex::DPAD_RIGHT];
       bool b_pressed = joypad_control_.buttons[JoypadButtonIndex::B_BUTTON];
       bool a_pressed = joypad_control_.buttons[JoypadButtonIndex::A_BUTTON];
-      
+
       if ((konami_code_ == 0 && dPad_up_pressed) ||
           (konami_code_ == 1 && dPad_up_pressed) ||
           (konami_code_ == 2 && dPad_down_pressed) ||
@@ -160,7 +160,7 @@ void Remote::updateRobotState(void)
       {
         debounce_start_ = true;
       }
-      
+
       // On Back button press, iterate system state backward
       bool back_pressed = joypad_control_.buttons[BACK];
       if (back_pressed && debounce_back_) // Back button
@@ -168,7 +168,7 @@ void Remote::updateRobotState(void)
         int next_robot_state = std::max((static_cast<int>(robot_state_)-1), 0);
         robot_state_ = static_cast<RobotState>(next_robot_state);
         debounce_back_ = false;
-      }	
+      }
       else if (!back_pressed)
       {
         debounce_back_ = true;
@@ -198,7 +198,7 @@ void Remote::updateGaitSelection(void)
       // Cycle gaits on A button press
       bool a_pressed = joypad_control_.buttons[A_BUTTON];
       if (a_pressed && debounce_a_)
-      {    
+      {
         int next_gait_selection = (static_cast<int>(gait_selection_) + 1) % GAIT_DESIGNATION_COUNT;
         gait_selection_ = static_cast<GaitDesignation>(next_gait_selection);
         debounce_a_ = false;
@@ -266,11 +266,11 @@ void Remote::updatePlannerMode(void)
       // Cycle auto navigation mode on Y button press
       bool y_pressed = joypad_control_.buttons[JoypadButtonIndex::Y_BUTTON];
       if (y_pressed && debounce_y_)
-      {    
+      {
         int next_planner_mode = (static_cast<int>(planner_mode_)+1) % PLANNER_MODE_COUNT;
         planner_mode_ = static_cast<PlannerMode>(next_planner_mode);
         debounce_y_ = false;
-      }  
+      }
       else if (!y_pressed)
       {
         debounce_y_ = true;
@@ -384,10 +384,31 @@ void Remote::updateParameterAdjustment(void)
     case (JOYPAD):
     {
       // Message with 1.0 or -1.0 to increment/decrement parameter
-      parameter_adjustment_msg_.data = joypad_control_.axes[JoypadAxisIndex::DPAD_UP_DOWN]; 
-      
+      //parameter_adjustment_msg_.data = joypad_control_.axes[JoypadAxisIndex::DPAD_UP_DOWN];
+      if (joypad_control_.buttons[JoypadButtonIndex::DPAD_UP])
+      {
+      parameter_adjustment_msg_.data = 1;
+      }
+      else if (joypad_control_.buttons[JoypadButtonIndex::DPAD_DOWN])
+      {
+      parameter_adjustment_msg_.data = -1;
+      }
+
       // Cycle parameter selction on left/right dpad press
-      int dpad_left_right = joypad_control_.axes[JoypadAxisIndex::DPAD_LEFT_RIGHT];
+      //int dpad_left_right = joypad_control_.axes[JoypadAxisIndex::DPAD_LEFT_RIGHT];
+      if (joypad_control_.buttons[JoypadButtonIndex::DPAD_LEFT])
+      {
+      dpad_left_right = 1;
+      }
+      else if (joypad_control_.buttons[JoypadButtonIndex::DPAD_RIGHT])
+      {
+      dpad_left_right = -1;
+      }
+      else
+      {
+      dpad_left_right = 0;
+      }
+
       if (dpad_left_right && debounce_dpad_)
       {
         int next_parameter_selection = (static_cast<int>(parameter_selection_) - dpad_left_right) % PARAMETER_SELECTION_COUNT;
@@ -481,7 +502,7 @@ void Remote::updateSecondaryLegSelection(void)
           {
             next_secondary_leg_selection = (static_cast<int>(primary_leg_selection_)+1)%(leg_count_ +1);
           }
-          
+
           if (next_secondary_leg_selection < leg_count_)
           {
             secondary_leg_selection_ = static_cast<LegDesignation>(next_secondary_leg_selection);
@@ -490,7 +511,7 @@ void Remote::updateSecondaryLegSelection(void)
           {
             secondary_leg_selection_ = LEG_UNDESIGNATED;
           }
-          
+
           debounce_right_bumper_ = false;
         }
         else if (!right_bumper_pressed)
@@ -529,7 +550,7 @@ void Remote::updatePrimaryLegState(void)
           int next_primary_leg_state = (static_cast<int>(primary_leg_state_) + 1) % LEG_STATE_COUNT;
           primary_leg_state_ = static_cast<LegState>(next_primary_leg_state);
           // If 2nd leg selection same as 1st whilst 1st is toggling state, then iterate 2nd leg selection
-          if (secondary_leg_selection_ == primary_leg_selection_) 
+          if (secondary_leg_selection_ == primary_leg_selection_)
           {
             int nextSecondaryLegSelection = (static_cast<int>(primary_leg_selection_)+1)%(leg_count_);
             secondary_leg_selection_ = static_cast<LegDesignation>(nextSecondaryLegSelection);
@@ -557,7 +578,7 @@ void Remote::updatePrimaryLegState(void)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Remote::updateSecondaryLegState(void)
-{  
+{
   switch (current_interface_type_)
   {
     case (KEYBOARD):
@@ -572,7 +593,7 @@ void Remote::updateSecondaryLegState(void)
           int next_secondary_leg_state = (static_cast<int>(secondary_leg_state_) + 1) % LEG_STATE_COUNT;
           secondary_leg_state_ = static_cast<LegState>(next_secondary_leg_state);
           // If 1st leg selection same as 2nd whilst 2ndst is toggling state, then iterate 1st leg selection
-          if (secondary_leg_selection_ == primary_leg_selection_) 
+          if (secondary_leg_selection_ == primary_leg_selection_)
           {
             int nextPrimaryLegSelection = (static_cast<int>(secondary_leg_selection_)+1)%(leg_count_);
             primary_leg_selection_ = static_cast<LegDesignation>(nextPrimaryLegSelection);
@@ -670,7 +691,7 @@ void Remote::updateDesiredVelocity(void)
             orientation_y = 0;
           }
 
-          // Logic regarding deciding syropod's rotation 
+          // Logic regarding deciding syropod's rotation
           double compass_inverter = (params_.invert_compass.data ? -1.0 : 1.0);
           double relative_compass = android_sensor_control_.relative_compass.data * compass_inverter;
 
@@ -680,7 +701,7 @@ void Remote::updateDesiredVelocity(void)
           {
             rotate = ROTATE_COUNTERCLOCKWISE;
           }
-          else if (relative_compass < -0.3 && (abs(orientation_x) + abs(orientation_y) < 0.3)) 
+          else if (relative_compass < -0.3 && (abs(orientation_x) + abs(orientation_y) < 0.3))
           {
             rotate = ROTATE_CLOCKWISE;
           }
@@ -796,7 +817,7 @@ void Remote::updateTipVelocityModes(void)
     bool left_bumper_pressed = joypad_control_.buttons[JoypadButtonIndex::LEFT_BUMPER];
     if (left_bumper_pressed && debounce_left_bumper_)
     {
-      int next_primary_tip_velocity_input_mode = 
+      int next_primary_tip_velocity_input_mode =
         (static_cast<int>(primary_tip_velocity_input_mode_) + 1) % TIP_VELOCITY_INPUT_MODE_COUNT;
       primary_tip_velocity_input_mode_ = static_cast<TipVelocityInputMode>(next_primary_tip_velocity_input_mode);
       debounce_left_bumper_ = false;
@@ -806,13 +827,13 @@ void Remote::updateTipVelocityModes(void)
       debounce_left_bumper_ = true;
     }
   }
-  
+
   if (secondary_leg_state_ == MANUAL && current_interface_type_ == JOYPAD)
   {
     bool right_bumper_pressed = joypad_control_.buttons[JoypadButtonIndex::RIGHT_BUMPER];
     if (right_bumper_pressed && debounce_right_bumper_)
     {
-      int next_secondary_tip_velocity_input_mode = 
+      int next_secondary_tip_velocity_input_mode =
         (static_cast<int>(secondary_tip_velocity_input_mode_) + 1) % TIP_VELOCITY_INPUT_MODE_COUNT;
       secondary_tip_velocity_input_mode_ = static_cast<TipVelocityInputMode>(next_secondary_tip_velocity_input_mode);
       debounce_right_bumper_ = false;
@@ -828,7 +849,7 @@ void Remote::updateTipVelocityModes(void)
 
 void Remote::updatePrimaryTipVelocity(void)
 {
-  if (primary_leg_state_ == MANUAL) 
+  if (primary_leg_state_ == MANUAL)
   {
     //resetMessages();
     switch (current_interface_type_)
@@ -874,7 +895,7 @@ void Remote::updatePrimaryTipVelocity(void)
 
 void Remote::updateSecondaryTipVelocity(void)
 {
-  if (secondary_leg_state_ == MANUAL) 
+  if (secondary_leg_state_ == MANUAL)
   {
     //resetMessages();
     switch (current_interface_type_)
@@ -929,17 +950,17 @@ void Remote::resetMessages(void)
 	desired_velocity_msg_.angular.z = 0.0;
 	desired_pose_msg_.linear.x = 0.0;
 	desired_pose_msg_.linear.y = 0.0;
-	desired_pose_msg_.linear.z = 0.0;	
+	desired_pose_msg_.linear.z = 0.0;
 	desired_pose_msg_.angular.x = 0.0;
 	desired_pose_msg_.angular.y = 0.0;
-	desired_pose_msg_.angular.z = 0.0; 
+	desired_pose_msg_.angular.z = 0.0;
 	primary_tip_velocity_msg_.x = 0.0;
 	primary_tip_velocity_msg_.y = 0.0;
 	primary_tip_velocity_msg_.z = 0.0;
 	secondary_tip_velocity_msg_.x = 0.0;
 	secondary_tip_velocity_msg_.y = 0.0;
 	secondary_tip_velocity_msg_.z = 0.0;
-  
+
   parameter_adjustment_msg_.data = 0.0;
 }
 
@@ -960,28 +981,28 @@ void Remote::publishMessages(void)
   secondary_leg_state_msg_.data = static_cast<int>(secondary_leg_state_);
   parameter_selection_msg_.data = static_cast<int>(parameter_selection_);
   pose_reset_mode_msg_.data = static_cast<int>(pose_reset_mode_);
-  
+
   // Publish messages
   system_state_pub_.publish(system_state_msg_);
   robot_state_pub_.publish(robot_state_msg_);
-  desired_velocity_pub_.publish(desired_velocity_msg_);	
+  desired_velocity_pub_.publish(desired_velocity_msg_);
   desired_pose_pub_.publish(desired_pose_msg_);
   primary_tip_velocity_pub_.publish(primary_tip_velocity_msg_);
-  secondary_tip_velocity_pub_.publish(secondary_tip_velocity_msg_);    
-    
+  secondary_tip_velocity_pub_.publish(secondary_tip_velocity_msg_);
+
   gait_selection_pub_.publish(gait_selection_msg_);
   posing_mode_pub_.publish(posing_mode_msg_);
   cruise_control_pub_.publish(cruise_control_mode_msg_);
-  auto_navigation_pub_.publish(auto_navigation_mode_msg_);    
+  auto_navigation_pub_.publish(auto_navigation_mode_msg_);
   planner_mode_pub_.publish(planner_mode_msg_);
   primary_leg_selection_pub_.publish(primary_leg_selection_msg_);
   secondary_leg_selection_pub_.publish(secondary_leg_selection_msg_);
   primary_leg_state_pub_.publish(primary_leg_state_msg_);
-  secondary_leg_state_pub_.publish(secondary_leg_state_msg_);    
+  secondary_leg_state_pub_.publish(secondary_leg_state_msg_);
   parameter_selection_pub_.publish(parameter_selection_msg_);
-  parameter_adjustment_pub_.publish(parameter_adjustment_msg_);    
+  parameter_adjustment_pub_.publish(parameter_adjustment_msg_);
   pose_reset_pub_.publish(pose_reset_mode_msg_);
-  
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1136,16 +1157,16 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "syropod_remote");
 
   Remote remote;
-  
+
   Parameter<std::vector<std::string>> leg_id_array;
   leg_id_array.init("leg_id");
   remote.setLegCount(leg_id_array.data.size());
 
-  // Setup publish loop_rate 
+  // Setup publish loop_rate
   Parameter<double> publish_rate;
   publish_rate.init("publish_rate", "syropod_remote/");
   ros::Rate loopRate(publish_rate.data);
-  
+
   while(ros::ok())
   {
     remote.resetMessages();
